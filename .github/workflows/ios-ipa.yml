@@ -1,0 +1,53 @@
+name: Build iOS IPA (No Sign, Minimal)
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - dev
+
+jobs:
+  build-ios:
+    runs-on: macos-latest
+
+    steps:
+      # 1. 拉 dev 分支代码
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: dev
+
+      # 2. 安装 Flutter（关键：用新版本，避免 intl 冲突）
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.38.x"
+          cache: true
+
+      # 3. 拉依赖
+      - name: Flutter pub get
+        run: |
+          cd simple_live_app
+          flutter pub get
+
+      # 4. 构建 iOS（不签名）
+      - name: Build iOS (no codesign)
+        run: |
+          cd simple_live_app
+          flutter build ios --release --no-codesign
+
+      # 5. 手动打包 ipa（Payload 方式）
+      - name: Create unsigned IPA
+        run: |
+          cd simple_live_app
+          mkdir -p build/ios/iphoneos/Payload
+          cp -R build/ios/iphoneos/Runner.app build/ios/iphoneos/Payload/Runner.app
+          cd build/ios/iphoneos
+          zip -q -r ios_no_sign.ipa Payload
+
+      # 6. 上传 ipa
+      - name: Upload IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-unsigned-ipa
+          path: simple_live_app/build/ios/iphoneos/ios_no_sign.ipa
